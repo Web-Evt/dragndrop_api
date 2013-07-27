@@ -1,0 +1,179 @@
+<?php
+
+/**
+ * @file
+ * Drag & Drop API module main file.
+ * Provides API for drag & drop uploads.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function dragndrop_api_menu() {
+  $items['dragndrop-api/example'] = array(
+    'title' => 'Drag & Drop API Example 1',
+    'page callback' => 'dragndrop_api_example1',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['system/dragndrop/%'] = array(
+    'page callback' => 'dragndrop_api_callback',
+    'page arguments' => array(2),
+    'access arguments' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+
+}
+
+/**
+ * Default ajax callback for dropzones.
+ *
+ * Calls the 'callback' function from the dropzone settings array.
+ *
+ * @param $id
+ *  Id of the dropzone that has been generated in dragndrop_api_dropzone_add().
+ *
+ * @return mixed
+ */
+function dragndrop_api_callback($id) {
+  if ($settings = dragndrop_api_cache_get($id)) {
+    $file = $_FILES[$settings['name']];
+
+    if (is_callable($settings['callback'])) {
+      return $settings['callback']($settings['name'], $file);
+    }
+  }
+}
+
+/**
+ * Add a dropzone.
+ *
+ * @param string $selector
+ *  A jQuery selector of the element that must become a dropzone.
+ *
+ * @param array $settings
+ *  Settings for the dropzone.
+ */
+function dragndrop_api_dropzone_add($selector, array $settings) {
+  $js_added = & drupal_static(__FUNCTION__, array());
+
+  if (!$js_added) {
+    $path = drupal_get_path('module', 'dragndrop_api');
+    drupal_add_js($path . '/js/dragndrop-api.dnd.js');
+    drupal_add_js($path . '/js/dragndrop-api.js');
+
+    $js_added = TRUE;
+  }
+
+  // Set default URL in DnD settings if callback is provided.
+  if ($settings['callback']) {
+    $id = drupal_hash_base64(uniqid(mt_rand(), TRUE) . mt_rand());
+    $settings['url'] = url('system/dragndrop/' . $id);
+    dragndrop_api_cache_set($id, $settings);
+  }
+
+  // Add Drupal setting in this way in order to escape from settings
+  // duplicating.
+  $javascript = & drupal_static('drupal_add_js', array());
+  $javascript['settings']['data'][__FUNCTION__]['dragndropAPI'][$selector] = $settings;
+}
+
+/**
+ * A callback to process '#attached' setting of the elements to add a dropzone.
+ *
+ * I.e.
+ * @code
+ *   ...
+ *   $element['#attached']['dragndrop_api'][] = array(
+ *    'selector' => '#my-dropzone',
+ *    'settings' => array(
+ *        'name' => 'my_dropzone',
+ *        'callback' => 'my_dropzone_callback'
+ *      )
+ *   );
+ *   ...
+ * @endcode
+ *
+ * @param $selector
+ * @param $settings
+ *
+ * @see drupal_process_attached()
+ */
+function dragndrop_api($selector, $settings) {
+  dragndrop_api_dropzone_add($selector, $settings);
+}
+
+/**
+ * Set DnD settings cache.
+ *
+ * @param $id
+ * @param $settings
+ */
+function dragndrop_api_cache_set($id, $settings) {
+  // Cache lifetime is 6 hours.
+  $expire = 21600;
+
+  cache_set('dragndrop_api:' . $id, $settings, 'cache', REQUEST_TIME + $expire);
+}
+
+/**
+ * Get DnD cached settings by id.
+ *
+ * @param $id
+ *
+ * @return mixed
+ */
+function dragndrop_api_cache_get($id) {
+  if ($cached = cache_get('dragndrop_api:' . $id)) {
+    return $cached->data;
+  }
+}
+
+/**
+ * Page callback for the example 1.
+ *
+ * @return array
+ */
+function dragndrop_api_example1() {
+  if ($_FILES) {
+    exit(print_r($_FILES, 1));
+  }
+  $build = array();
+
+  $settings = array(
+    'selector' => '#dragndrop-example1',
+    'settings' => array(
+      'name' => 'dragndrop-example1',
+//    'url' => 'dragndrop-api/example',
+      'callback' => 'dragndrop_api_example1_callback',
+    ),
+  );
+
+  $build['dropzone'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'id' => 'dragndrop-example1'
+    ),
+    'text' => array(
+      '#markup' => t('<br/><br/>Test<br/><br/>')
+    ),
+    '#attached' => array(
+      'dragndrop_api' => array(
+        $settings
+      )
+    ),
+  );
+
+//  dragndrop_api_dropzone_add('#dragndrop-example1', $settings);
+
+  return $build;
+}
+
+function dragndrop_api_example1_callback($name, $file) {
+  print_r($file);
+
+  return NULL;
+}
