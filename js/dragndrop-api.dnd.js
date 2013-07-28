@@ -3,11 +3,9 @@
  *
  * @param {jQuery} droppable
  *  jQuery object of droppable areas.
- *  Each area must have an validators function in it.
- *  Eg. $('.droppable').data('validators', [validateFunction1, validateFunction1]);
  * @param {Object} settings
  *
- * DnD events:
+ * Each droppable area has these events:
  *  dnd:addFiles:added
  *    Arguments: dndFile
  *
