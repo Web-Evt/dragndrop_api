@@ -55,7 +55,7 @@ function DnD(droppable, settings) {
 
 (function ($) {
   // Get plain jQuery version and check whether is needed to apply data trick in
-  // ajax options. See line 428 for comments.
+  // ajax options.
   var jQueryVersion = parseInt($.fn.jquery.split('.').join(''));
   var applyDataTrick = jQueryVersion < 150;
 
