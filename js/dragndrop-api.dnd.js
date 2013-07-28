@@ -7,10 +7,48 @@
  *  Eg. $('.droppable').data('validators', [validateFunction1, validateFunction1]);
  * @param {Object} settings
  *
- *  To see how to build validator function @see validateFile.
+ * DnD events:
+ *  dnd:addFiles:added
+ *    Arguments: dndFile
+ *
+ *  dnd:addFiles:finished
+ *    Arguments: filesList
+ *
+ *  dnd:createPreview
+ *    Arguments: dndFile
+ *
+ *  dnd:removePreview
+ *    Arguments: dndFile
+ *
+ *  dnd:validateFile
+ *    Arguments: dndFile
+ *
+ *  dnd:showError
+ *    Arguments: dndFile
+ *
+ *  dnd:removeFile
+ *    Arguments: dndFile
+ *
+ *  dnd:removeFile:empty
+ *    Arguments: <none>
+ *
+ *  dnd:send:form
+ *    Arguments: form
+ *
+ *  dnd:send:beforeSend
+ *    Arguments: xmlhttprequest, options
+ *
+ *  dnd:send:success
+ *    Arguments: response, status
+ *
+ *  dnd:send:complete
+ *    Arguments: response, status
+ *
+ *  dnd:send:options
+ *    Arguments: options
  */
 function DnD(droppable, settings) {
-  this.$droppable = jQuery(droppable).eq(0);
+  this.$droppable = jQuery(droppable);
   this.settings = settings;
   this.attachEvents();
 }
@@ -23,14 +61,18 @@ function DnD(droppable, settings) {
 
   DnD.prototype = {
     $droppable: null,
+    settings: {},
 
     /**
      * Attach events to the given droppable areas.
      */
     attachEvents: function () {
-      this.$droppable[0].ondrop = this.eventsList.drop.bind(this);
-      this.$droppable[0].ondragover = this.eventsList.dragover.bind(this);
-      this.$droppable[0].ondragleave = this.eventsList.dragleave.bind(this);
+      var me = this;
+      $.each(this.$droppable, function (i, droppable) {
+        droppable.ondrop = me.eventsList.drop.bind(me);
+        droppable.ondragover = me.eventsList.dragover.bind(me);
+        droppable.ondragleave = me.eventsList.dragleave.bind(me);
+      });
 
       // Attach event to create a preview when a file is added.
       this.$droppable.bind('dnd:addFiles:added', this.createPreview);
@@ -52,9 +94,10 @@ function DnD(droppable, settings) {
           return;
         }
 
-        this.$droppable.removeClass('drag-over').addClass('dropped');
+        var $dropppable = $(event.target);
+        $dropppable.removeClass('drag-over').addClass('dropped');
 
-        this.addFiles(transFiles);
+        this.addFiles($dropppable, transFiles);
       },
 
       /**
@@ -67,7 +110,7 @@ function DnD(droppable, settings) {
         event.stopPropagation();
         event.preventDefault();
 
-        this.$droppable.addClass('drag-over');
+        $(event.target).addClass('drag-over');
       },
 
       /**
@@ -80,121 +123,99 @@ function DnD(droppable, settings) {
         event.stopPropagation();
         event.preventDefault();
 
-        this.$droppable.removeClass('drag-over');
+        $(event.target).removeClass('drag-over');
       }
     },
 
     /**
      * Add files to the droppable area.
      *
+     * @param {jQuery} $droppable
+     *  A droppable area that should receive files.
      * @param {Array} transFiles
      *  Array of files that should be added to the dropppable area.
      */
-    addFiles: function (transFiles) {
-      var file, error, messages = [], filesList = this.getFilesList();
+    addFiles: function ($droppable, transFiles) {
+      var dndFile, messages = [], filesList = this.getFilesList();
       for (var i = 0, n = transFiles.length; i < n; i++) {
-        error = this.validateFile(transFiles[i], filesList, this.$droppable.data('validators'));
-        if (error !== true) {
-          messages.push(error);
+        dndFile = {
+          file: transFiles[i],
+          $droppable: $droppable,
+          $preview: null,
+          error: null
+        };
+
+        this.validateFile(dndFile, filesList);
+        if (dndFile.error) {
+          messages.push(dndFile.error);
           continue;
         }
 
-        file = {
-          file: transFiles[i],
-          $preview: null,
-          errorStatus: !error,
-          errorMessage: error
-        };
-        filesList.push(file);
+        filesList.push(dndFile);
 
         /**
-         * Each file have:
-         *  - file {Object}: dropped file object.
+         * Each dndFile have:
+         *  - dndFile {Object}: dropped dndFile object.
          *  - $preview {jQuery|null}: preview object.
-         *  - errorStatus {Boolean}: whether file pass validation or not.
+         *  - errorStatus {Boolean}: whether dndFile pass validation or not.
          *  - error {String}: error message if present.
          *
          * @type {Array}
          */
         this.setFilesList(filesList);
 
-        // Trigger event telling that file has been added.
-        this.$droppable.trigger('dnd:addFiles:added', file);
+        // Trigger event telling that dndFile has been added.
+        $droppable.trigger('dnd:addFiles:added', [dndFile]);
       }
 
       if (messages.length) {
-        this.showError(messages);
+        this.showError($droppable, messages);
       }
 
       // Trigger the event telling that all files have been added.
-      this.$droppable.trigger('dnd:addFiles:finished', transFiles);
+      $droppable.trigger('dnd:addFiles:finished', [transFiles]);
     },
 
     /**
      * Create previews of dropped files.
      *
-     * @param file
+     * @param dndFile
      */
-    createPreview: function (file) {
+    createPreview: function (dndFile) {
       var reader = new FileReader();
       var me = this;
 
-      reader.onload = function (event) {
-        // Give others an ability to build a preview for a file.
-        me.$droppable.trigger('dnd:createPreview', file);
+      reader.onload = function () {
+        // Give others an ability to build a preview for a dndFile.
+        // Trigger event for all droppables. Each one should decide what to do
+        // accodring to the $droppable reference in the dndFile object.
+        me.$droppable.trigger('dnd:createPreview', [dndFile]);
       };
-      reader.readAsDataURL(file.file);
+      reader.readAsDataURL(dndFile.file);
     },
 
     /**
-     * Remove preview for the file.
+     * Remove preview for the dndFile.
      *
-     * @param file
+     * @param dndFile
      */
-    removePreview: function (file) {
-      // Give others an ability to remove file preview.
-      this.$droppable.trigger('dnd:removePreview', file);
+    removePreview: function (dndFile) {
+      // Give others an ability to remove dndFile preview.
+      // Trigger event for all droppables. Each one should decide what to do
+      // accodring to the $droppable reference in the dndFile object.
+      this.$droppable.trigger('dnd:removePreview', [dndFile]);
     },
 
     /**
-     * Validate file by given function.
+     * Validate dndFile by given function.
      *
-     * @param file
+     * @param dndFile
      * @param filesList
      *  Array of files already dropped.
-     * @param {Function} validators
-     *  Example of validator function.
      *
-     *  var validateFunction = function(file) {
-         *    var errorMessage = 'Max file size exceed'.
-         *    var maxSize = 10000;
-         *
-         *    return (file.size <= maxSize) ? true : errorMessage;
-         *  }
-     *
-     * @returns {String|Boolean}
-     *  Return error message if not valid or True when valid.
      */
-    validateFile: function (file, filesList, validators) {
-      var validatorsList = [];
-      var errorMessage = true;
-      validators = validators || [];
-
-      if (typeof validators == 'function') {
-        validatorsList.push(validators);
-      } else {
-        validatorsList = validators;
-      }
-
-      // Iterate through all validators functions.
-      for (var i = 0, n = validatorsList.length; i < n; i++) {
-        errorMessage = validatorsList[i](file, filesList);
-        if (errorMessage !== true) {
-          return errorMessage;
-        }
-      }
-
-      return errorMessage;
+    validateFile: function (dndFile, filesList) {
+      dndFile.$droppable.trigger('dnd:validateFile', [dndFile, filesList]);
     },
 
     /**
@@ -202,51 +223,51 @@ function DnD(droppable, settings) {
      *
      * @param messages
      */
-    showError: function (messages) {
+    showError: function ($droppable, messages) {
       if (typeof messages != 'object') {
         messages = [messages];
       }
 
-      this.$droppable.trigger('dnd:files:error', messages);
+      $droppable.trigger('dnd:showError', [messages]);
     },
 
     /**
-     * Remove a file from droppable area.
+     * Remove a dndFile from droppable area.
      *
-     * @param file
-     *  The file that should be removed.
+     * @param dndFile
+     *  The dndFile that should be removed.
      */
-    removeFile: function (file) {
+    removeFile: function (dndFile) {
       var me = this;
       var droppedFiles = me.getFilesList();
 
       $.each(droppedFiles, function (index, eachFile) {
-        if (file == eachFile) {
+        if (dndFile == eachFile) {
           droppedFiles.splice(index, 1);
-          me.removePreview(file);
+          me.removePreview(dndFile);
         }
       });
 
       me.setFilesList(droppedFiles);
 
-      // Trigger an event telling that file has been removed.
-      this.$droppable.trigger('dnd:removeFile', file);
+      // Trigger an event telling that dndFile has been removed.
+      this.$droppable.trigger('dnd:removeFile', [dndFile]);
       if (!droppedFiles.length) {
         this.$droppable.trigger('dnd:removeFile:empty');
       }
     },
 
     /**
-     * Remove files from the droppable area.
+     * Remove dndFiles from the droppable area.
      *
-     * @param files
-     *  Files to be removed. Removes all files if undefined.
+     * @param dndFiles
+     *  Files to be removed. Removes all dndFiles if undefined.
      */
-    removeFiles: function (files) {
+    removeFiles: function (dndFiles) {
       var me = this;
-      files = files || this.getFilesList();
+      dndFiles = dndFiles || this.getFilesList();
 
-      $.each(files, function (index, eachFile) {
+      $.each(dndFiles, function (index, eachFile) {
         me.removeFile(eachFile);
       });
     },
@@ -273,9 +294,10 @@ function DnD(droppable, settings) {
     /**
      * Send files.
      */
-    send: function () {
+    send: function ($droppable) {
       var me = this;
-      var $droppable = this.$droppable;
+      $droppable = $droppable || this.$droppable;
+
       var filesList = this.getFilesList();
       if (!filesList.length) {
         return;
@@ -284,12 +306,18 @@ function DnD(droppable, settings) {
       var form = new FormData();
 
       // Append filesList to the form.
-      $.each(filesList, function (index, file) {
-        form.append(me.settings.name, file.file);
+      $.each(filesList, function (index, dndFile) {
+        // jQuery().is() is not working?
+        // Add to the form only files from the provided droppable area.
+        $droppable.each(function (i, el) {
+          if (el === dndFile.$droppable[0]) {
+            form.append(me.settings.name, dndFile.file);
+          }
+        });
       });
 
       // Give an ability to add data to the form.
-      $droppable.trigger('dnd:send:form', form);
+      $droppable.trigger('dnd:send:form', [form]);
 
       var options = {
         url: this.settings.url,
@@ -325,7 +353,7 @@ function DnD(droppable, settings) {
       }
 
       // Give an ability to modify ajax options before sending request.
-      $droppable.trigger('dnd:send:options', options);
+      $droppable.trigger('dnd:send:options', [options]);
 
       // Finally, send a request.
       $.ajax(options);

@@ -14,13 +14,21 @@
         var dnd = $droppable.DnD(settings);
 
         var fileAddedCallback = function (event, file) {
-          $droppable.html(file.file.name);
+          $(event.target).html(file.file.name);
           $droppable.DnD().send();
         };
         $droppable.bind('dnd:addFiles:added', fileAddedCallback);
 
         $droppable.bind('dnd:send:success', function (event, response) {
           alert(response);
+        });
+
+        $droppable.bind('dnd:validateFile', function (event, file, filesList) {
+          file.error = "Some error occured";
+        });
+
+        $droppable.bind('dnd:showError', function (event, messages) {
+          $(event.target).html(messages.join());
         });
       });
     }

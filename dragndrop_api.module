@@ -144,7 +144,7 @@ function dragndrop_api_example1() {
   $build = array();
 
   $settings = array(
-    'selector' => '#dragndrop-example1',
+    'selector' => '.dragndrop-example1',
     'settings' => array(
       'name' => 'dragndrop-example1',
 //    'url' => 'dragndrop-api/example',
@@ -152,13 +152,29 @@ function dragndrop_api_example1() {
     ),
   );
 
+
   $build['dropzone'] = array(
     '#type' => 'container',
     '#attributes' => array(
-      'id' => 'dragndrop-example1'
+      'class' => 'dragndrop-example1'
     ),
     'text' => array(
       '#markup' => t('<br/><br/>Test<br/><br/>')
+    ),
+    '#attached' => array(
+      'dragndrop_api' => array(
+        $settings
+      )
+    ),
+  );
+
+  $build['dropzone2'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => 'dragndrop-example1'
+    ),
+    'text' => array(
+      '#markup' => t('<br/><br/>Test 2<br/><br/>')
     ),
     '#attached' => array(
       'dragndrop_api' => array(
