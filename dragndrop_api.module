@@ -25,7 +25,6 @@ function dragndrop_api_menu() {
   );
 
   return $items;
-
 }
 
 /**
@@ -69,7 +68,7 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
   }
 
   // Set default URL in DnD settings if callback is provided.
-  if ($settings['callback']) {
+  if (!empty($settings['callback'])) {
     $id = drupal_hash_base64(uniqid(mt_rand(), TRUE) . mt_rand());
     $settings['url'] = url('system/dragndrop/' . $id);
     dragndrop_api_cache_set($id, $settings);

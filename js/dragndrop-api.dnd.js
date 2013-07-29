@@ -21,7 +21,7 @@
  *  dnd:validateFile
  *    Arguments: dndFile
  *
- *  dnd:showError
+ *  dnd:showErrors
  *    Arguments: dndFile
  *
  *  dnd:removeFile
@@ -74,6 +74,20 @@ function DnD(droppable, settings) {
 
       // Attach event to create a preview when a file is added.
       this.$droppable.bind('dnd:addFiles:added', this.createPreview);
+
+      // Add default validators.
+      var validators = this.settings.validators;
+      if (validators.maxSize) {
+        this.$droppable.bind('dnd:validateFile', this.validatorsList.fileSize);
+      }
+
+      if (validators.extensions) {
+        this.$droppable.bind('dnd:validateFile', this.validatorsList.fileExt);
+      }
+
+      if (this.settings.cardinality != -1) {
+        this.$droppable.bind('dnd:validateFile', this.validatorsList.filesNum);
+      }
     },
 
     eventsList: {
@@ -92,7 +106,7 @@ function DnD(droppable, settings) {
           return;
         }
 
-        var $dropppable = $(event.target);
+        var $dropppable = $(event.currentTarget);
         $dropppable.removeClass('drag-over').addClass('dropped');
 
         this.addFiles($dropppable, transFiles);
@@ -125,6 +139,40 @@ function DnD(droppable, settings) {
       }
     },
 
+    validatorsList: {
+      fileSize: function (event, dndFile) {
+        var settings = $(this).DnD().settings;
+        if (dndFile.file.size > settings.validators.maxSize) {
+          dndFile.error = 'fileSize';
+        }
+      },
+
+      fileExt: function (event, dndFile) {
+        var settings = $(this).DnD().settings;
+        var ext = dndFile.file.name.split('.').pop();
+        var isValid = false;
+
+        $.each(settings.validators.extensions, function (index, allowedExt) {
+          if (allowedExt == ext) {
+            isValid = true;
+            return false;
+          }
+        });
+
+        if (!isValid) {
+          dndFile.error = 'fileExt';
+        }
+      },
+
+      filesNum: function (event, dndFile, filesList) {
+        var settings = $(this).DnD().settings;
+
+        if (filesList.length > settings.cardinality) {
+          dndFile.error = 'filesNum';
+        }
+      }
+    },
+
     /**
      * Add files to the droppable area.
      *
@@ -134,7 +182,7 @@ function DnD(droppable, settings) {
      *  Array of files that should be added to the dropppable area.
      */
     addFiles: function ($droppable, transFiles) {
-      var dndFile, messages = [], filesList = this.getFilesList();
+      var dndFile, errors = [], filesList = this.getFilesList();
       for (var i = 0, n = transFiles.length; i < n; i++) {
         dndFile = {
           file: transFiles[i],
@@ -145,7 +193,7 @@ function DnD(droppable, settings) {
 
         this.validateFile(dndFile, filesList);
         if (dndFile.error) {
-          messages.push(dndFile.error);
+          errors.push(dndFile.error);
           continue;
         }
 
@@ -166,8 +214,8 @@ function DnD(droppable, settings) {
         $droppable.trigger('dnd:addFiles:added', [dndFile]);
       }
 
-      if (messages.length) {
-        this.showError($droppable, messages);
+      if (errors.length) {
+        this.showErrors($droppable, errors);
       }
 
       // Trigger the event telling that all files have been added.
@@ -219,14 +267,15 @@ function DnD(droppable, settings) {
     /**
      * Show errors for the droppable.
      *
-     * @param messages
+     * @param $droppable
+     * @param errors
      */
-    showError: function ($droppable, messages) {
-      if (typeof messages != 'object') {
-        messages = [messages];
+    showErrors: function ($droppable, errors) {
+      if (typeof errors != 'object') {
+        errors = [errors];
       }
 
-      $droppable.trigger('dnd:showError', [messages]);
+      $droppable.trigger('dnd:showErrors', [errors]);
     },
 
     /**
