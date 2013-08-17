@@ -143,7 +143,13 @@ function DnD(droppable, settings) {
       fileSize: function (event, dndFile) {
         var settings = $(this).DnD().settings;
         if (dndFile.file.size > settings.validators.maxSize) {
-          dndFile.error = 'fileSize';
+          dndFile.error = {
+            type: 'fileSize',
+            args: {
+              '%filename': dndFile.file.name,
+              '%filesize': dndFile.file.size
+            }
+          };
         }
       },
 
@@ -160,7 +166,12 @@ function DnD(droppable, settings) {
         });
 
         if (!isValid) {
-          dndFile.error = 'fileExt';
+          dndFile.error = {
+            type: 'fileExt',
+            args: {
+              '%ext': ext
+            }
+          };
         }
       },
 
@@ -168,7 +179,12 @@ function DnD(droppable, settings) {
         var settings = $(this).DnD().settings;
 
         if (filesList.length > settings.cardinality) {
-          dndFile.error = 'filesNum';
+          dndFile.error = {
+            type: 'filesNum',
+            args: {
+              '%number': filesList.length
+            }
+          };
         }
       }
     },

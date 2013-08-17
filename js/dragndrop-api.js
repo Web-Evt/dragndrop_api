@@ -8,8 +8,17 @@
     attach: function (context, settings) {
       $.each(settings.dragndropAPI, function (selector, settings) {
         var $droppable = $(selector);
+        var $element = $droppable.parent();
 
         var dnd = $droppable.DnD(settings);
+
+        $('.droppable-browse-button', $droppable).click(function (event) {
+          event.preventDefault();
+
+          $('.droppable-standard-upload-hidden input', $element).click();
+
+          return false;
+        });
 
         $droppable.bind('dnd:showErrors', function (event, errors) {
           alert(errors.join());

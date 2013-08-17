@@ -187,6 +187,13 @@ function dragndrop_api_example1() {
   return $build;
 }
 
+/**
+ * Ajax file callback for example dropzones.
+ *
+ * @param $name
+ * @param $file
+ * @return null
+ */
 function dragndrop_api_example1_callback($name, $file) {
   print_r($file);
 
