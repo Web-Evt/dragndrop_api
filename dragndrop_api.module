@@ -74,6 +74,8 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
     dragndrop_api_cache_set($id, $settings);
   }
 
+  $settings['selector'] = $selector;
+
   // Add Drupal setting in this way in order to escape from settings
   // duplicating.
   $javascript = & drupal_static('drupal_add_js', array());

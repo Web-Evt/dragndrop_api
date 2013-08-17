@@ -8,13 +8,9 @@
     attach: function (context, settings) {
       $.each(settings.dragndropAPI, function (selector, settings) {
         var $droppable = $(selector);
-        var $element = $droppable.parent();
-
         var dnd = $droppable.DnD(settings);
 
-        $droppable.bind('dnd:showErrors', function (event, errors) {
-          alert(errors.join());
-        });
+        $droppable.bind('dnd:showErrors', showErrors);
 
 //        var fileAddedCallback = function (event, file) {
 //          $(event.target).html(file.file.name);
@@ -35,5 +31,16 @@
 //        });
       });
     }
-  }
+  };
+
+  /**
+   * Default showErrors callback for DnD.
+   *
+   * @param event
+   * @param errors
+   */
+  var showErrors = function (event, errors) {
+    alert(errors.join());
+  };
+
 })(jQuery);

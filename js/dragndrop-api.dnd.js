@@ -46,9 +46,9 @@
  *    Arguments: options
  */
 function DnD(droppable, settings) {
-  this.$droppable = jQuery(droppable);
+  this.$droppables = jQuery(droppable);
   this.settings = settings;
-  this.attachEvents();
+  this.attachEvents(this.$droppables);
 }
 
 (function ($) {
@@ -58,36 +58,36 @@ function DnD(droppable, settings) {
   var applyDataTrick = jQueryVersion < 150;
 
   DnD.prototype = {
-    $droppable: null,
+    $droppables: null,
     $activeDroppable: null,
     settings: {},
 
     /**
      * Attach events to the given droppable areas.
      */
-    attachEvents: function () {
+    attachEvents: function ($droppables) {
       var me = this;
-      $.each(this.$droppable, function (i, droppable) {
+      $.each($droppables, function (i, droppable) {
         droppable.ondrop = me.eventsList.drop.bind(me);
         droppable.ondragover = me.eventsList.dragover.bind(me);
         droppable.ondragleave = me.eventsList.dragleave.bind(me);
       });
 
       // Attach event to create a preview when a file is added.
-      this.$droppable.bind('dnd:addFiles:added', this.createPreview);
+      $droppables.bind('dnd:addFiles:added', this.createPreview);
 
       // Add default validators.
       var validators = this.settings.validators;
       if (validators.maxSize) {
-        this.$droppable.bind('dnd:validateFile', this.validatorsList.fileSize);
+        $droppables.bind('dnd:validateFile', this.validatorsList.fileSize);
       }
 
       if (validators.extensions) {
-        this.$droppable.bind('dnd:validateFile', this.validatorsList.fileExt);
+        $droppables.bind('dnd:validateFile', this.validatorsList.fileExt);
       }
 
       if (this.settings.cardinality != -1) {
-        this.$droppable.bind('dnd:validateFile', this.validatorsList.filesNum);
+        $droppables.bind('dnd:validateFile', this.validatorsList.filesNum);
       }
     },
 
@@ -238,6 +238,14 @@ function DnD(droppable, settings) {
       // Trigger the event telling that all files have been added.
       $droppable.trigger('dnd:addFiles:finished', [transFiles]);
     },
+    
+    addDroppable: function (droppable) {
+      var $droppable = $(droppable);
+      this.attachEvents($droppable);
+      $droppable.data('dnd', this);
+
+      this.$droppables = this.$droppables.add($droppable);
+    },
 
     /**
      * Create previews of dropped files.
@@ -266,7 +274,7 @@ function DnD(droppable, settings) {
       // Give others an ability to remove dndFile preview.
       // Trigger event for all droppables. Each one should decide what to do
       // accodring to the $droppable reference in the dndFile object.
-      this.$droppable.trigger('dnd:removePreview', [dndFile]);
+      this.$droppables.trigger('dnd:removePreview', [dndFile]);
     },
 
     /**
@@ -315,9 +323,9 @@ function DnD(droppable, settings) {
       me.setFilesList(droppedFiles);
 
       // Trigger an event telling that dndFile has been removed.
-      this.$droppable.trigger('dnd:removeFile', [dndFile]);
+      this.$droppables.trigger('dnd:removeFile', [dndFile]);
       if (!droppedFiles.length) {
-        this.$droppable.trigger('dnd:removeFile:empty');
+        this.$droppables.trigger('dnd:removeFile:empty');
       }
     },
 
@@ -342,7 +350,7 @@ function DnD(droppable, settings) {
      * @returns {*|Array}
      */
     getFilesList: function () {
-      return this.$droppable.data('files') || [];
+      return this.$droppables.data('files') || [];
     },
 
     /**
@@ -352,7 +360,7 @@ function DnD(droppable, settings) {
      */
     setFilesList: function (filesList) {
       filesList = filesList || [];
-      this.$droppable.data('files', filesList);
+      this.$droppables.data('files', filesList);
     },
 
     /**
@@ -360,7 +368,7 @@ function DnD(droppable, settings) {
      */
     send: function ($droppable) {
       var me = this;
-      $droppable = $droppable || this.$droppable;
+      $droppable = $droppable || this.$droppables;
 
       var filesList = this.getFilesList();
       if (!filesList.length) {
@@ -432,7 +440,7 @@ function DnD(droppable, settings) {
    */
   $.fn.DnD = function (settings) {
     var dnd = this.data('dnd');
-    if (!dnd) {
+    if (!dnd && settings) {
       this.data('dnd', new DnD(this, settings));
     }
 
