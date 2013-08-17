@@ -59,6 +59,7 @@ function DnD(droppable, settings) {
 
   DnD.prototype = {
     $droppable: null,
+    $activeDroppable: null,
     settings: {},
 
     /**

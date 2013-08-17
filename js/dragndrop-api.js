@@ -12,14 +12,6 @@
 
         var dnd = $droppable.DnD(settings);
 
-        $('.droppable-browse-button', $droppable).click(function (event) {
-          event.preventDefault();
-
-          $('.droppable-standard-upload-hidden input', $element).click();
-
-          return false;
-        });
-
         $droppable.bind('dnd:showErrors', function (event, errors) {
           alert(errors.join());
         });
