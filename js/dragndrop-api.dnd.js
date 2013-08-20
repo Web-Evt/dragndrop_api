@@ -44,6 +44,12 @@
  *
  *  dnd:send:options
  *    Arguments: options
+ *
+ *  dnd:send:init
+ *    Arguments: <none>
+ *
+ *  dnd:send:destroy
+ *    Arguments: <none>
  */
 function DnD(droppable, settings) {
   this.$droppables = jQuery();
