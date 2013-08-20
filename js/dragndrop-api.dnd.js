@@ -46,9 +46,10 @@
  *    Arguments: options
  */
 function DnD(droppable, settings) {
-  this.$droppables = jQuery(droppable);
+  this.$droppables = jQuery();
   this.settings = settings;
-  this.attachEvents(this.$droppables);
+
+  this.addDroppable(droppable);
 }
 
 (function ($) {
@@ -64,6 +65,8 @@ function DnD(droppable, settings) {
 
     /**
      * Attach events to the given droppable areas.
+     *
+     * @param {jQuery} $droppables
      */
     attachEvents: function ($droppables) {
       var me = this;
@@ -74,20 +77,52 @@ function DnD(droppable, settings) {
       });
 
       // Attach event to create a preview when a file is added.
-      $droppables.bind('dnd:addFiles:added', this.createPreview);
+      $droppables.bind('dnd:addFiles:added', me.createPreview);
 
       // Add default validators.
-      var validators = this.settings.validators;
+      var validators = me.settings.validators;
       if (validators.maxSize) {
-        $droppables.bind('dnd:validateFile', this.validatorsList.fileSize);
+        $droppables.bind('dnd:validateFile', me.validatorsList.fileSize);
       }
 
       if (validators.extensions) {
-        $droppables.bind('dnd:validateFile', this.validatorsList.fileExt);
+        $droppables.bind('dnd:validateFile', me.validatorsList.fileExt);
       }
 
-      if (this.settings.cardinality != -1) {
-        $droppables.bind('dnd:validateFile', this.validatorsList.filesNum);
+      if (me.settings.cardinality != -1) {
+        $droppables.bind('dnd:validateFile', me.validatorsList.filesNum);
+      }
+    },
+
+    /**
+     * Detach events from the given droppable areas.
+     *
+     * @param {jQuery} $droppables
+     */
+    detachEvents: function ($droppables) {
+      var me = this;
+
+      $.each($droppables, function (i, droppable) {
+        droppable.ondrop = null;
+        droppable.ondragover = null;
+        droppable.ondragleave = null;
+      });
+
+      // Attach event to create a preview when a file is added.
+      $droppables.unbind('dnd:addFiles:added', me.createPreview);
+
+      // Add default validators.
+      var validators = me.settings.validators;
+      if (validators.maxSize) {
+        $droppables.unbind('dnd:validateFile', me.validatorsList.fileSize);
+      }
+
+      if (validators.extensions) {
+        $droppables.unbind('dnd:validateFile', me.validatorsList.fileExt);
+      }
+
+      if (me.settings.cardinality != -1) {
+        $droppables.unbind('dnd:validateFile', me.validatorsList.filesNum);
       }
     },
 
@@ -170,6 +205,8 @@ function DnD(droppable, settings) {
           dndFile.error = {
             type: 'fileExt',
             args: {
+              '%filename': dndFile.file.name,
+              '%allowed': settings.validators.extensions.join(','),
               '%ext': ext
             }
           };
@@ -183,7 +220,9 @@ function DnD(droppable, settings) {
           dndFile.error = {
             type: 'filesNum',
             args: {
-              '%number': filesList.length
+              '%filename': dndFile.file.name,
+              '%number': filesList.length,
+              '%allowed': settings.cardinality
             }
           };
         }
@@ -233,18 +272,42 @@ function DnD(droppable, settings) {
 
       if (errors.length) {
         this.showErrors($droppable, errors);
+        return;
       }
 
       // Trigger the event telling that all files have been added.
       $droppable.trigger('dnd:addFiles:finished', [transFiles]);
     },
-    
+
+    /**
+     * Add new droppable zone.
+     *
+     * @param {string|jQuery} droppable
+     */
     addDroppable: function (droppable) {
       var $droppable = $(droppable);
       this.attachEvents($droppable);
       $droppable.data('dnd', this);
 
       this.$droppables = this.$droppables.add($droppable);
+
+      $droppable.trigger('dnd:init');
+    },
+
+    /**
+     * Remove droppable zone.
+     *
+     * @param {string|jQuery} droppable
+     */
+    removeDroppable: function (droppable) {
+      var $droppable = $(droppable);
+
+      this.detachEvents($droppable);
+      $droppable.data('dnd', null);
+
+      this.$droppables = this.$droppables.not($droppable);
+
+      $droppable.trigger('dnd:destroy');
     },
 
     /**
@@ -384,6 +447,8 @@ function DnD(droppable, settings) {
         $droppable.each(function (i, el) {
           if (el === dndFile.$droppable[0]) {
             form.append(me.settings.name, dndFile.file);
+            // File is successfully appended to the FormData, remove it now.
+            me.removeFile(dndFile);
           }
         });
       });

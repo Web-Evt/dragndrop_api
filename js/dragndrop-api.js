@@ -8,27 +8,33 @@
     attach: function (context, settings) {
       $.each(settings.dragndropAPI, function (selector, settings) {
         var $droppable = $(selector);
-        var dnd = $droppable.DnD(settings);
+        var dnd;
+        // Check if a droppable is a mirror.
+        if (settings.asMirrorFor) {
+          // Try to get DnD instance.
+          dnd = $(settings.asMirrorFor);
+          // Add an event callback for adding a droppable, because may be
+          // the mirrored droppable does not exist yet, so act when it is
+          // initiated.
+          dnd.one('dnd:init', function () {
+            $(this).DnD().addDroppable($droppable);
+          });
+        }
+        // Otherwise just create a new droppable instance.
+        else {
+          dnd = $droppable.DnD(settings);
+          $droppable.bind('dnd:showErrors', showErrors);
+        }
+      });
+    },
 
-        $droppable.bind('dnd:showErrors', showErrors);
-
-//        var fileAddedCallback = function (event, file) {
-//          $(event.target).html(file.file.name);
-//          $droppable.DnD().send();
-//        };
-//        $droppable.bind('dnd:addFiles:added', fileAddedCallback);
-//
-//        $droppable.bind('dnd:send:success', function (event, response) {
-//          alert(response);
-//        });
-//
-//        $droppable.bind('dnd:validateFile', function (event, file, filesList) {
-//          file.error = "Some error occured";
-//        });
-//
-//        $droppable.bind('dnd:showErrors', function (event, messages) {
-//          $(event.target).html(messages.join());
-//        });
+    detach: function (context, settings) {
+      $.each(settings.dragndropAPI, function (selector) {
+        var $droppable = $(selector);
+        var dnd = $droppable.DnD();
+        if (dnd) {
+          dnd.removeDroppable($droppable);
+        }
       });
     }
   };
