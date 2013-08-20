@@ -48,7 +48,10 @@
  *  dnd:send:init
  *    Arguments: <none>
  *
- *  dnd:send:destroy
+ *  dnd:send:destroy:before
+ *    Arguments: <none>
+ *
+ *  dnd:send:destroy:after
  *    Arguments: <none>
  */
 function DnD(droppable, settings) {
@@ -77,9 +80,9 @@ function DnD(droppable, settings) {
     attachEvents: function ($droppables) {
       var me = this;
       $.each($droppables, function (i, droppable) {
-        droppable.ondrop = me.eventsList.drop.bind(me);
-        droppable.ondragover = me.eventsList.dragover.bind(me);
-        droppable.ondragleave = me.eventsList.dragleave.bind(me);
+        $.each(me.eventsList, function (name, func) {
+          droppable[name] = func.bind(me);
+        });
       });
 
       // Attach event to create a preview when a file is added.
@@ -109,9 +112,9 @@ function DnD(droppable, settings) {
       var me = this;
 
       $.each($droppables, function (i, droppable) {
-        droppable.ondrop = null;
-        droppable.ondragover = null;
-        droppable.ondragleave = null;
+        $.each(me.eventsList, function (name, func) {
+          droppable[name] = null;
+        });
       });
 
       // Attach event to create a preview when a file is added.
@@ -138,7 +141,7 @@ function DnD(droppable, settings) {
        *
        * @param event
        */
-      drop: function (event) {
+      ondrop: function (event) {
         // Prevent drop event from bubbling through parent elements.
         event.stopPropagation();
         event.preventDefault();
@@ -159,7 +162,7 @@ function DnD(droppable, settings) {
        *
        * @param event
        */
-      dragover: function (event) {
+      ondragover: function (event) {
         // Prevent the event from bubbling through parent elements.
         event.stopPropagation();
         event.preventDefault();
@@ -172,7 +175,7 @@ function DnD(droppable, settings) {
        *
        * @param event
        */
-      dragleave: function (event) {
+      ondragleave: function (event) {
         // Prevent the event from bubbling through parent elements.
         event.stopPropagation();
         event.preventDefault();
@@ -308,12 +311,14 @@ function DnD(droppable, settings) {
     removeDroppable: function (droppable) {
       var $droppable = $(droppable);
 
+      $droppable.trigger('dnd:destroy:before', [$droppable]);
+
       this.detachEvents($droppable);
       $droppable.data('dnd', null);
 
       this.$droppables = this.$droppables.not($droppable);
 
-      $droppable.trigger('dnd:destroy');
+      $droppable.trigger('dnd:destroy:after', [$droppable]);
     },
 
     /**
@@ -462,6 +467,10 @@ function DnD(droppable, settings) {
       // Give an ability to add data to the form.
       $droppable.trigger('dnd:send:form', [form]);
 
+      // Save 'dnd:send:complete' handlers of the $droppable in a separate
+      // variable as the element can be destroyed after the ajax request.
+      var completeHandlers = $.extend({}, $droppable.data('events')['dnd:send:complete']);
+
       var options = {
         url: this.settings.url,
         // Trick to overcome jQuery Update dependency.
@@ -485,7 +494,10 @@ function DnD(droppable, settings) {
           $droppable.trigger('dnd:send:success', [response, status]);
         },
         complete: function (response, status) {
-          $droppable.trigger('dnd:send:complete', [response, status]);
+          // Call 'dnd:send:complete' handlers that have been saved earlier.
+          $.each(completeHandlers, function (i, event) {
+            event.handler(response, status);
+          });
         }
       };
 
