@@ -297,7 +297,7 @@ function DnD(droppable, settings) {
     addDroppable: function (droppable) {
       var $droppable = $(droppable);
       this.attachEvents($droppable);
-      $droppable.data('dnd', this);
+      $droppable.data('DnD', this);
 
       this.$droppables = this.$droppables.add($droppable);
 
@@ -315,7 +315,7 @@ function DnD(droppable, settings) {
       $droppable.trigger('dnd:destroy:before', [$droppable]);
 
       this.detachEvents($droppable);
-      $droppable.data('dnd', null);
+      $droppable.data('DnD', null);
 
       this.$droppables = this.$droppables.not($droppable);
 
@@ -358,7 +358,6 @@ function DnD(droppable, settings) {
      * @param dndFile
      * @param filesList
      *  Array of files already dropped.
-     *
      */
     validateFile: function (dndFile, filesList) {
       dndFile.$droppable.trigger('dnd:validateFile', [dndFile, filesList]);
@@ -388,20 +387,29 @@ function DnD(droppable, settings) {
       var me = this;
       var droppedFiles = me.getFilesList();
 
+      var notEmpty = [];
       $.each(droppedFiles, function (index, eachFile) {
         if (dndFile == eachFile) {
           droppedFiles.splice(index, 1);
           me.removePreview(dndFile);
+        }
+        else {
+          notEmpty.push(eachFile.$droppable);
         }
       });
 
       me.setFilesList(droppedFiles);
 
       // Trigger an event telling that dndFile has been removed.
-      this.$droppables.trigger('dnd:removeFile', [dndFile]);
-      if (!droppedFiles.length) {
-        this.$droppables.trigger('dnd:removeFile:empty');
-      }
+      me.$droppables.trigger('dnd:removeFile', [dndFile]);
+      // Check the droppables and trigger the events for those that are empty.
+      $.each(me.$droppables, function (i, droppable) {
+        if ($.inArray(droppable, notEmpty) == -1) {
+          var $droppable = $(droppable);
+          $droppable.removeClass('dropped');
+          $droppable.trigger('dnd:removeFile:empty', [$droppable]);
+        }
+      });
     },
 
     /**
@@ -441,9 +449,9 @@ function DnD(droppable, settings) {
     /**
      * Send files.
      */
-    send: function ($droppable) {
+    send: function ($droppables) {
       var me = this;
-      $droppable = $droppable || this.$droppables;
+      $droppables = $droppables || this.$droppables;
 
       var filesList = this.getFilesList();
       if (!filesList.length) {
@@ -456,7 +464,7 @@ function DnD(droppable, settings) {
       $.each(filesList, function (index, dndFile) {
         // jQuery().is() is not working?
         // Add to the form only files from the provided droppable area.
-        $droppable.each(function (i, el) {
+        $droppables.each(function (i, el) {
           if (el === dndFile.$droppable[0]) {
             form.append(me.settings.name, dndFile.file);
             // File is successfully appended to the FormData, remove it now.
@@ -466,11 +474,11 @@ function DnD(droppable, settings) {
       });
 
       // Give an ability to add data to the form.
-      $droppable.trigger('dnd:send:form', [form]);
+      $droppables.trigger('dnd:send:form', [form]);
 
-      // Save 'dnd:send:complete' handlers of the $droppable in a separate
+      // Save 'dnd:send:complete' handlers of the $droppables in a separate
       // variable as the element can be destroyed after the ajax request.
-      var completeHandlers = $.extend({}, $droppable.data('events')['dnd:send:complete']);
+      var completeHandlers = $.extend({}, $droppables.data('events')['dnd:send:complete']);
 
       var options = {
         url: this.settings.url,
@@ -489,10 +497,10 @@ function DnD(droppable, settings) {
             options.data = form;
           }
 
-          $droppable.trigger('dnd:send:beforeSend', [xmlhttprequest, options]);
+          $droppables.trigger('dnd:send:beforeSend', [xmlhttprequest, options]);
         },
         success: function (response, status) {
-          $droppable.trigger('dnd:send:success', [response, status]);
+          $droppables.trigger('dnd:send:success', [response, status]);
         },
         complete: function (response, status) {
           // Call 'dnd:send:complete' handlers that have been saved earlier.
@@ -509,7 +517,7 @@ function DnD(droppable, settings) {
       }
 
       // Give an ability to modify ajax options before sending request.
-      $droppable.trigger('dnd:send:options', [options]);
+      $droppables.trigger('dnd:send:options', [options]);
 
       // Finally, send a request.
       $.ajax(options);
