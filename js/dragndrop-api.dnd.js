@@ -523,9 +523,9 @@ function DnD(droppable, settings) {
    * @constructor
    */
   $.fn.DnD = function (settings) {
-    var dnd = this.data('dnd');
+    var dnd = this.data('DnD');
     if (!dnd && settings) {
-      this.data('dnd', new DnD(this, settings));
+      this.data('DnD', new DnD(this, settings));
     }
 
     return dnd;

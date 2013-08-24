@@ -74,6 +74,9 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
     dragndrop_api_cache_set($id, $settings);
   }
 
+  // Give an ability to alter dropzone settings.
+  drupal_alter('dragndrop_api_dropzone', $settings, $selector);
+
   $settings['selector'] = $selector;
 
   // Add Drupal setting in this way in order to escape from settings
