@@ -1,6 +1,6 @@
 /**
  * @file
- *
+ * Contains behavior to initialize DnD instances.
  */
 
 (function ($) {
@@ -15,12 +15,19 @@
           if (settings.asMirrorFor) {
             // Try to get DnD instance.
             dnd = $(settings.asMirrorFor);
-            // Add an event callback for adding a droppable, because may be
-            // the mirrored droppable does not exist yet, so act when it is
-            // initiated.
-            dnd.one('dnd:init', function () {
-              $(this).DnD().addDroppable($droppable);
-            });
+            // Add the event callback only if droppable is found.
+            if (dnd.size()) {
+              // Add an event callback for adding a droppable, because may be
+              // the mirrored droppable does not exist yet, so act when it is
+              // initiated.
+              dnd.one('dnd:init', function () {
+                $(this).DnD().addDroppable($droppable);
+              });
+            }
+            // Main droppable area is not found, so remove the processed class.
+            else {
+              $droppable.removeClass('dnd-api-processed');
+            }
           }
           // Otherwise just create a new droppable instance.
           else {
@@ -31,13 +38,13 @@
       });
     },
 
-    detach: function (context, settings) {
+    detach: function () {
       $.each(Drupal.settings.dragndropAPI, function (selector) {
         var $droppable = $(selector);
         var dnd = $droppable.DnD();
         if (dnd) {
-          dnd.removeDroppable($droppable);
           $droppable.removeClass('dnd-api-processed');
+          dnd.removeDroppable($droppable);
         }
       });
     }

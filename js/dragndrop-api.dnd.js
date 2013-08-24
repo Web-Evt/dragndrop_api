@@ -1,5 +1,6 @@
 /**
- * DnD magic.
+ * @file
+ * Contains DnD class.
  *
  * @param {jQuery} droppable
  *  jQuery object of droppable areas.
