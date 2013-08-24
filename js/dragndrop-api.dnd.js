@@ -325,17 +325,17 @@ function DnD(droppable, settings) {
     /**
      * Create previews of dropped files.
      *
+     * @param event
      * @param dndFile
      */
-    createPreview: function (dndFile) {
+    createPreview: function (event, dndFile) {
       var reader = new FileReader();
-      var me = this;
 
       reader.onload = function () {
         // Give others an ability to build a preview for a dndFile.
         // Trigger event for all droppables. Each one should decide what to do
         // accodring to the $droppable reference in the dndFile object.
-        me.$droppable.trigger('dnd:createPreview', [dndFile]);
+        dndFile.$droppable.trigger('dnd:createPreview', [dndFile]);
       };
       reader.readAsDataURL(dndFile.file);
     },

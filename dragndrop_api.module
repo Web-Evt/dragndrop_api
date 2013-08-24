@@ -61,7 +61,10 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
 
   if (!$js_added) {
     $path = drupal_get_path('module', 'dragndrop_api');
-    drupal_add_js($path . '/js/dragndrop-api.dnd.js');
+    $options = array(
+      'group' => JS_LIBRARY
+    );
+    drupal_add_js($path . '/js/dragndrop-api.dnd.js', $options);
     drupal_add_js($path . '/js/dragndrop-api.js');
 
     $js_added = TRUE;
