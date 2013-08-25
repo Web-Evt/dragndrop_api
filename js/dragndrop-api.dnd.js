@@ -237,7 +237,7 @@ function DnD(droppable, settings) {
       filesNum: function (event, dndFile, filesList) {
         var settings = $(this).DnD().settings;
 
-        if (filesList.length > settings.cardinality) {
+        if (filesList.length >= settings.cardinality) {
           dndFile.error = {
             type: 'filesNum',
             args: {
