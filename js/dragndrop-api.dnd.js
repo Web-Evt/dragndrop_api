@@ -7,53 +7,57 @@
  * @param {Object} settings
  *
  * Each droppable area has these events:
- *  dnd:addFiles:added
- *    Arguments: dndFile
  *
- *  dnd:addFiles:finished
- *    Arguments: filesList
+ *  dnd:addFiles:before
+ *    Arguments: event
+ *
+ *  dnd:addFiles:added
+ *    Arguments: event, dndFile
+ *
+ *  dnd:addFiles:after
+ *    Arguments: event, filesList
  *
  *  dnd:createPreview
- *    Arguments: dndFile
+ *    Arguments: event, dndFile
  *
  *  dnd:removePreview
- *    Arguments: dndFile
+ *    Arguments: event, dndFile
  *
  *  dnd:validateFile
- *    Arguments: dndFile
+ *    Arguments: event, dndFile
  *
  *  dnd:showErrors
- *    Arguments: dndFile
+ *    Arguments: event, dndFile
  *
  *  dnd:removeFile
- *    Arguments: dndFile
+ *    Arguments: event, dndFile
  *
  *  dnd:removeFile:empty
- *    Arguments: <none>
+ *    Arguments: event
  *
  *  dnd:send:form
- *    Arguments: form
+ *    Arguments: event, form
  *
  *  dnd:send:beforeSend
- *    Arguments: xmlhttprequest, options
+ *    Arguments: event, xmlhttprequest, options, sentFiles
  *
  *  dnd:send:success
- *    Arguments: response, status
+ *    Arguments: response, status, sentFiles
  *
  *  dnd:send:complete
- *    Arguments: response, status
+ *    Arguments: response, status, sentFiles
  *
  *  dnd:send:options
- *    Arguments: options
+ *    Arguments: event, options
  *
  *  dnd:send:init
- *    Arguments: <none>
+ *    Arguments: event
  *
- *  dnd:send:destroy:before
- *    Arguments: <none>
+ *  dnd:destroy:before
+ *    Arguments: event
  *
- *  dnd:send:destroy:after
- *    Arguments: <none>
+ *  dnd:destroy:after
+ *    Arguments: event
  */
 function DnD(droppable, settings) {
   this.$droppables = jQuery();
@@ -102,6 +106,13 @@ function DnD(droppable, settings) {
       if (me.settings.cardinality != -1) {
         $droppables.bind('dnd:validateFile', me.validatorsList.filesNum);
       }
+
+      /**
+       * Add an event callback to remove from DnD files that have been sent.
+       */
+      $droppables.bind('dnd:send:beforeSend', function (event, response, status, sentFiles) {
+        me.removeFiles(sentFiles);
+      });
     },
 
     /**
@@ -249,6 +260,9 @@ function DnD(droppable, settings) {
      */
     addFiles: function ($droppable, transFiles) {
       var dndFile, errors = [], filesList = this.getFilesList();
+      
+      $droppable.trigger('dnd:addFiles:before');
+
       for (var i = 0, n = transFiles.length; i < n; i++) {
         dndFile = {
           file: transFiles[i],
@@ -267,9 +281,9 @@ function DnD(droppable, settings) {
 
         /**
          * Each dndFile have:
-         *  - dndFile {Object}: dropped dndFile object.
+         *  - file {Object}: dropped file object.
+         *  - $droppable {jQuery|null}: preview object.
          *  - $preview {jQuery|null}: preview object.
-         *  - errorStatus {Boolean}: whether dndFile pass validation or not.
          *  - error {String}: error message if present.
          *
          * @type {Array}
@@ -286,7 +300,7 @@ function DnD(droppable, settings) {
       }
 
       // Trigger the event telling that all files have been added.
-      $droppable.trigger('dnd:addFiles:finished', [transFiles]);
+      $droppable.trigger('dnd:addFiles:after', [transFiles]);
     },
 
     /**
@@ -387,29 +401,21 @@ function DnD(droppable, settings) {
       var me = this;
       var droppedFiles = me.getFilesList();
 
-      var notEmpty = [];
-      $.each(droppedFiles, function (index, eachFile) {
+      $.each(droppedFiles, function (i, eachFile) {
         if (dndFile == eachFile) {
-          droppedFiles.splice(index, 1);
+          droppedFiles.splice(i, 1);
           me.removePreview(dndFile);
-        }
-        else {
-          notEmpty.push(eachFile.$droppable);
+          return false;
         }
       });
 
       me.setFilesList(droppedFiles);
 
       // Trigger an event telling that dndFile has been removed.
-      me.$droppables.trigger('dnd:removeFile', [dndFile]);
-      // Check the droppables and trigger the events for those that are empty.
-      $.each(me.$droppables, function (i, droppable) {
-        if ($.inArray(droppable, notEmpty) == -1) {
-          var $droppable = $(droppable);
-          $droppable.removeClass('dropped');
-          $droppable.trigger('dnd:removeFile:empty', [$droppable]);
-        }
-      });
+      dndFile.$droppable.trigger('dnd:removeFile', [dndFile]);
+      if (!me.getFilesList(dndFile.$droppable).length) {
+        dndFile.$droppable.trigger('dnd:removeFile:empty', [dndFile.$droppable]);
+      }
     },
 
     /**
@@ -430,10 +436,28 @@ function DnD(droppable, settings) {
     /**
      * Get files list of the droppable area.
      *
+     * $droppable {jQuery} Droppables to get files list from.
+     *
      * @returns {*|Array}
      */
-    getFilesList: function () {
-      return this.$droppables.data('files') || [];
+    getFilesList: function ($droppables) {
+      var list = [];
+      if ($droppables) {
+        $.each(this.filesList, function (a, dndFile) {
+          /**
+           * jQuery().is() is not working?
+           */
+          $.each($droppables, function (b, droppable) {
+            if (dndFile.$droppable[0] == droppable) {
+              list.push(dndFile);
+            }
+          });
+        });
+      }
+      else {
+        list = this.filesList;
+      }
+      return list || [];
     },
 
     /**
@@ -442,8 +466,7 @@ function DnD(droppable, settings) {
      * @param filesList
      */
     setFilesList: function (filesList) {
-      filesList = filesList || [];
-      this.$droppables.data('files', filesList);
+      this.filesList = filesList || [];
     },
 
     /**
@@ -452,33 +475,35 @@ function DnD(droppable, settings) {
     send: function ($droppables) {
       var me = this;
       $droppables = $droppables || this.$droppables;
+      // Set flag telling that files are sending at the moment.
+      me.sending = true;
 
-      var filesList = this.getFilesList();
+      var filesList = this.getFilesList($droppables);
       if (!filesList.length) {
         return;
       }
 
       var form = new FormData();
+      var sentFiles = [];
 
       // Append filesList to the form.
       $.each(filesList, function (index, dndFile) {
-        // jQuery().is() is not working?
-        // Add to the form only files from the provided droppable area.
-        $droppables.each(function (i, el) {
-          if (el === dndFile.$droppable[0]) {
-            form.append(me.settings.name, dndFile.file);
-            // File is successfully appended to the FormData, remove it now.
-            me.removeFile(dndFile);
-          }
-        });
+        form.append(me.settings.name, dndFile.file);
+        // Add dndFile to the sent array to remove later.
+        sentFiles.push(dndFile);
       });
 
       // Give an ability to add data to the form.
       $droppables.trigger('dnd:send:form', [form]);
 
-      // Save 'dnd:send:complete' handlers of the $droppables in a separate
-      // variable as the element can be destroyed after the ajax request.
-      var completeHandlers = $.extend({}, $droppables.data('events')['dnd:send:complete']);
+      /**
+       * Save 'dnd:send:complete' and 'dnd:send:success' handlers of the
+       * $droppables in a separate variable as the element can be destroyed
+       * (or behaviors can be detached) after the ajax request.
+       */
+      var droppableEvents = $droppables.data('events');
+      var completeHandlers = $.extend({}, droppableEvents['dnd:send:complete']);
+      var successHandlers = $.extend({}, droppableEvents['dnd:send:success']);
 
       var options = {
         url: this.settings.url,
@@ -497,21 +522,28 @@ function DnD(droppable, settings) {
             options.data = form;
           }
 
-          $droppables.trigger('dnd:send:beforeSend', [xmlhttprequest, options]);
+          $droppables.trigger('dnd:send:beforeSend', [xmlhttprequest, options, sentFiles]);
         },
         success: function (response, status) {
-          $droppables.trigger('dnd:send:success', [response, status]);
+          // Call 'dnd:send:success' handlers that have been saved earlier.
+          $.each(successHandlers, function (i, event) {
+            event.handler(response, status, sentFiles);
+          });
         },
         complete: function (response, status) {
+          // Set the flag telling that sending is finished.
+          me.sending = false;
           // Call 'dnd:send:complete' handlers that have been saved earlier.
           $.each(completeHandlers, function (i, event) {
-            event.handler(response, status);
+            event.handler(response, status, sentFiles);
           });
         }
       };
 
-      // Set data for the request, if was not set in the beforeSend
-      // callback (jQuery version is 1.5.0 or higher).
+      /**
+       * Set data for the request, if was not set in the beforeSend
+       * callback (jQuery version is 1.5.0 or higher).
+       */
       if (!applyDataTrick) {
         options.data = form;
       }
