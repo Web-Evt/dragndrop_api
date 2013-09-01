@@ -18,7 +18,7 @@
  *    Arguments: event, filesList
  *
  *  dnd:createPreview
- *    Arguments: event, dndFile
+ *    Arguments: event, dndFile, {FileReader} reader
  *
  *  dnd:removePreview
  *    Arguments: event, dndFile
@@ -349,7 +349,7 @@ function DnD(droppable, settings) {
         // Give others an ability to build a preview for a dndFile.
         // Trigger event for all droppables. Each one should decide what to do
         // accodring to the $droppable reference in the dndFile object.
-        dndFile.$droppable.trigger('dnd:createPreview', [dndFile]);
+        dndFile.$droppable.trigger('dnd:createPreview', [dndFile, reader]);
       };
       reader.readAsDataURL(dndFile.file);
     },
