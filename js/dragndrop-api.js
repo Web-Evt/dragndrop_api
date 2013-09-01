@@ -5,9 +5,13 @@
 
 (function ($) {
   Drupal.behaviors.dragndropUploadAPI = {
-    attach: function () {
-      $.each(Drupal.settings.dragndropAPI, function (selector, settings) {
-        $(selector).once('dnd-api', function () {
+    attach: function (context, settings) {
+      if (!settings.dragndropAPI) {
+        return;
+      }
+
+      $.each(settings.dragndropAPI, function (selector, settings) {
+        $(selector, context).once('dnd-api', function () {
           var $droppable = $(this);
 
           var dnd;
@@ -38,15 +42,17 @@
       });
     },
 
-    detach: function () {
-      $.each(Drupal.settings.dragndropAPI, function (selector) {
-        var $droppable = $(selector);
-        var dnd = $droppable.DnD();
-        if (dnd) {
-          $droppable.removeClass('dnd-api-processed');
-          dnd.removeDroppable($droppable);
-        }
-      });
+    detach: function (context, settings) {
+      if (settings.dragndropAPI) {
+        $.each(settings.dragndropAPI, function (selector) {
+          var $droppable = $(selector, context);
+          var dnd = $droppable.DnD();
+          if (dnd) {
+            $droppable.removeClass('dnd-api-processed');
+            dnd.removeDroppable($droppable);
+          }
+        });
+      }
     }
   };
 
