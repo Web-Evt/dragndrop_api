@@ -60,12 +60,15 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
   $js_added = & drupal_static(__FUNCTION__, array());
 
   if (!$js_added) {
+    drupal_add_library('system', 'drupal.ajax');
+
     $path = drupal_get_path('module', 'dragndrop_api');
     $options = array(
       'group' => JS_LIBRARY
     );
     drupal_add_js($path . '/js/dragndrop-api.dnd.js', $options);
     drupal_add_js($path . '/js/dragndrop-api.js');
+
 
     $js_added = TRUE;
   }
@@ -80,10 +83,18 @@ function dragndrop_api_dropzone_add($selector, array $settings) {
   // Give an ability to alter dropzone settings.
   drupal_alter('dragndrop_api_dropzone', $settings, $selector);
 
-  $settings['selector'] = $selector;
+  $settings += array(
+    'selector' => $selector,
+    'validators' => array(),
+    'cardinality' => 1,
+    'name' => '',
+    'url' => '',
+  );
 
-  // Add Drupal setting in this way in order to escape from settings
-  // duplicating.
+  /**
+   * Add Drupal setting in this way in order to escape from settings
+   * duplicating.
+   */
   $javascript = & drupal_static('drupal_add_js', array());
   $javascript['settings']['data'][__FUNCTION__]['dragndropAPI'][$selector] = $settings;
 }

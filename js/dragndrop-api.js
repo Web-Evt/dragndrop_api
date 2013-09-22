@@ -37,6 +37,8 @@
           else {
             dnd = $droppable.DnD(settings);
             $droppable.bind('dnd:showErrors', showErrors);
+            $droppable.bind('dnd:send:options', sendOptions.bind(dnd));
+            $droppable.bind('dnd:addFiles:after', afterFilesAdded.bind(dnd));
           }
         });
       });
@@ -57,13 +59,74 @@
   };
 
   /**
-   * Default showErrors callback for DnD.
+   * Default dnd:showErrors callback for DnD.
    *
    * @param event
    * @param errors
    */
   var showErrors = function (event, errors) {
     alert(errors.join());
+  };
+
+  /**
+   * Default dnd:send:options callback for DnD.
+   *
+   * Adds Drupal.ajax support (including ajax commands).
+   *
+   * @param event
+   * @param options
+   * @param form
+   */
+  var sendOptions = function (event, options, form) {
+    var me = this;
+    /**
+     * Create a simple Drupal.ajax instance.
+     */
+    var ajaxSettings = {
+      url: settings.url,
+      event: 'dnd-never-triggered'
+    };
+    var ajax = new Drupal.ajax(false, me.$droppables, ajaxSettings);
+    var drupalAjaxOptions = $.extend({}, ajax.options);
+
+    options = $.extend(options, drupalAjaxOptions, {
+      cache: false,
+      data: null,
+      contentType: false,
+      processData: false,
+      beforeSend: function (xmlhttprequest, options) {
+        options.data = drupalAjaxOptions.data;
+
+        // Call standard Drupal ajax methods.
+        drupalAjaxOptions.beforeSerialize(me.$droppables, options);
+        drupalAjaxOptions.beforeSend(xmlhttprequest, options);
+
+        // Transform options.data into FormData.
+        var data = $.extend({}, options.data);
+        options.data = form;
+        $.each(data, function (key, value) {
+          form.append(key, value);
+        });
+      }
+    });
+
+    /**
+     * Default dnd:files:after callback for DnD.
+     *
+     * Send files automatically after they were dropped.
+     */
+    var afterFilesAdded = function () {
+      this.send();
+    };
+  };
+
+  /**
+   * Default dnd:files:after callback for DnD.
+   *
+   * Sends files automatically after they were dropped.
+   */
+  var afterFilesAdded = function () {
+    this.send();
   };
 
 })(jQuery);

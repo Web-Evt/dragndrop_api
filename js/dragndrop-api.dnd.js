@@ -9,7 +9,7 @@
  * Each droppable area has these events:
  *
  *  dnd:addFiles:before
- *    Arguments: event
+ *    Arguments: event, transFiles
  *
  *  dnd:addFiles:added
  *    Arguments: event, dndFile
@@ -35,22 +35,13 @@
  *  dnd:removeFile:empty
  *    Arguments: event
  *
- *  dnd:send:form
- *    Arguments: event, form
- *
- *  dnd:send:beforeSend
- *    Arguments: event, xmlhttprequest, options, sentFiles
- *
- *  dnd:send:success
- *    Arguments: response, status, sentFiles
+ *  dnd:send:options
+ *    Arguments: event, options, form
  *
  *  dnd:send:complete
  *    Arguments: response, status, sentFiles
  *
- *  dnd:send:options
- *    Arguments: event, options
- *
- *  dnd:send:init
+ *  dnd:init
  *    Arguments: event
  *
  *  dnd:destroy:before
@@ -67,14 +58,10 @@ function DnD(droppable, settings) {
 }
 
 (function ($) {
-  // Get plain jQuery version and check whether is needed to apply data trick in
-  // ajax options.
-  var jQueryVersion = parseInt($.fn.jquery.split('.').join(''));
-  var applyDataTrick = jQueryVersion < 150;
-
   DnD.prototype = {
     $droppables: null,
     $activeDroppable: null,
+    filesList: [],
     settings: {},
 
     /**
@@ -95,16 +82,16 @@ function DnD(droppable, settings) {
 
       // Add default validators.
       var validators = me.settings.validators;
-      if (validators.maxSize) {
-        $droppables.bind('dnd:validateFile', me.validatorsList.fileSize);
+      if (validators && validators.maxSize) {
+        $droppables.bind('dnd:validateFile', me.validatorsList.fileSize.bind(me));
       }
 
       if (validators.extensions) {
-        $droppables.bind('dnd:validateFile', me.validatorsList.fileExt);
+        $droppables.bind('dnd:validateFile', me.validatorsList.fileExt.bind(me));
       }
 
       if (me.settings.cardinality != -1) {
-        $droppables.bind('dnd:validateFile', me.validatorsList.filesNum);
+        $droppables.bind('dnd:validateFile', me.validatorsList.filesNum.bind(me));
       }
 
       /**
@@ -124,27 +111,16 @@ function DnD(droppable, settings) {
       var me = this;
 
       $.each($droppables, function (i, droppable) {
-        $.each(me.eventsList, function (name, func) {
+        $.each(me.eventsList, function (name) {
           droppable[name] = null;
         });
       });
 
-      // Attach event to create a preview when a file is added.
-      $droppables.unbind('dnd:addFiles:added', me.createPreview);
+      // Detach events of creating a preview when a file is added.
+      $droppables.unbind('dnd:addFiles:added');
 
-      // Add default validators.
-      var validators = me.settings.validators;
-      if (validators.maxSize) {
-        $droppables.unbind('dnd:validateFile', me.validatorsList.fileSize);
-      }
-
-      if (validators.extensions) {
-        $droppables.unbind('dnd:validateFile', me.validatorsList.fileExt);
-      }
-
-      if (me.settings.cardinality != -1) {
-        $droppables.unbind('dnd:validateFile', me.validatorsList.filesNum);
-      }
+      // Detach validators.
+      $droppables.unbind('dnd:validateFile');
     },
 
     eventsList: {
@@ -198,7 +174,7 @@ function DnD(droppable, settings) {
 
     validatorsList: {
       fileSize: function (event, dndFile) {
-        var settings = $(this).DnD().settings;
+        var settings = this.settings;
         if (dndFile.file.size > settings.validators.maxSize) {
           dndFile.error = {
             type: 'fileSize',
@@ -211,7 +187,7 @@ function DnD(droppable, settings) {
       },
 
       fileExt: function (event, dndFile) {
-        var settings = $(this).DnD().settings;
+        var settings = this.settings;
         var ext = dndFile.file.name.split('.').pop();
         var isValid = false;
 
@@ -235,7 +211,7 @@ function DnD(droppable, settings) {
       },
 
       filesNum: function (event, dndFile, filesList) {
-        var settings = $(this).DnD().settings;
+        var settings = this.settings;
 
         if (filesList.length >= settings.cardinality) {
           dndFile.error = {
@@ -260,8 +236,8 @@ function DnD(droppable, settings) {
      */
     addFiles: function ($droppable, transFiles) {
       var dndFile, errors = [], filesList = this.getFilesList();
-      
-      $droppable.trigger('dnd:addFiles:before');
+
+      $droppable.trigger('dnd:addFiles:before', [transFiles]);
 
       for (var i = 0, n = transFiles.length; i < n; i++) {
         dndFile = {
@@ -475,6 +451,7 @@ function DnD(droppable, settings) {
     send: function ($droppables) {
       var me = this;
       $droppables = $droppables || this.$droppables;
+
       // Set flag telling that files are sending at the moment.
       me.sending = true;
 
@@ -493,63 +470,53 @@ function DnD(droppable, settings) {
         sentFiles.push(dndFile);
       });
 
-      // Give an ability to add data to the form.
-      $droppables.trigger('dnd:send:form', [form]);
+      var options = {
+        url: me.settings.url,
+        type: 'POST',
+        cache: false,
+        // Do not set data here because of incorrect handling of content-type
+        // header in jQuery 1.4.4. Instead, set it in the beforeSend callback.
+        data: null,
+        contentType: false,
+        processData: false
+      };
+
+      // Give an ability to modify ajax options before sending request.
+      $droppables.trigger('dnd:send:options', [options, form]);
+
+      // Override beforeSend callback to set this.sending property to false.
+      var beforeSendCallback = options.beforeSend;
+      options.beforeSend = function (xmlhttprequest, options) {
+        beforeSendCallback(xmlhttprequest, options);
+
+        // Set data here if it hasn't been set before.
+        if (!options.data) {
+          options.data = form;
+        }
+      };
 
       /**
-       * Save 'dnd:send:complete' and 'dnd:send:success' handlers of the
+       * Save 'dnd:send:complete' handlers of the
        * $droppables in a separate variable as the element can be destroyed
        * (or behaviors can be detached) after the ajax request.
        */
       var droppableEvents = $droppables.data('events');
       var completeHandlers = $.extend({}, droppableEvents['dnd:send:complete']);
-      var successHandlers = $.extend({}, droppableEvents['dnd:send:success']);
 
-      var options = {
-        url: this.settings.url,
-        // Trick to overcome jQuery Update dependency.
-        // Do not set data here because of incorrent handling of content-type
-        // header in jQuery 1.4.4. Instead, set it in the beforeSend callback.
-        // data: form,
-        cache: false,
-        contentType: false,
-        processData: false,
-        type: 'POST',
-        beforeSend: function (xmlhttprequest, options) {
-          // Request data must be set here for jQuery version < 1.5.0.
-          // See line 339 for the comments.
-          if (applyDataTrick) {
-            options.data = form;
+      // Override complete callback to set this.sending property to false.
+      var completeCallback = options.complete;
+      options.complete = function (response, status) {
+        me.sending = false;
+
+        completeCallback(response, status);
+
+        // Call 'dnd:send:complete' handlers that have been saved earlier.
+        $.each(completeHandlers, function (i, event) {
+          if (event.handler(response, status, sentFiles) === false) {
+            return false;
           }
-
-          $droppables.trigger('dnd:send:beforeSend', [xmlhttprequest, options, sentFiles]);
-        },
-        success: function (response, status) {
-          // Call 'dnd:send:success' handlers that have been saved earlier.
-          $.each(successHandlers, function (i, event) {
-            event.handler(response, status, sentFiles);
-          });
-        },
-        complete: function (response, status) {
-          // Set the flag telling that sending is finished.
-          me.sending = false;
-          // Call 'dnd:send:complete' handlers that have been saved earlier.
-          $.each(completeHandlers, function (i, event) {
-            event.handler(response, status, sentFiles);
-          });
-        }
+        });
       };
-
-      /**
-       * Set data for the request, if was not set in the beforeSend
-       * callback (jQuery version is 1.5.0 or higher).
-       */
-      if (!applyDataTrick) {
-        options.data = form;
-      }
-
-      // Give an ability to modify ajax options before sending request.
-      $droppables.trigger('dnd:send:options', [options]);
 
       // Finally, send a request.
       $.ajax(options);
