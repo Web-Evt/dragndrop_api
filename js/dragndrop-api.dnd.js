@@ -81,12 +81,12 @@ function DnD(droppable, settings) {
       $droppables.bind('dnd:addFiles:added', me.createPreview);
 
       // Add default validators.
-      var validators = me.settings.validators;
-      if (validators && validators.maxSize) {
+      var validators = me.settings.validators || {};
+      if (validators.hasOwnProperty('maxSize')) {
         $droppables.bind('dnd:validateFile', me.validatorsList.fileSize.bind(me));
       }
 
-      if (validators.extensions) {
+      if (validators.hasOwnProperty('extensions')) {
         $droppables.bind('dnd:validateFile', me.validatorsList.fileExt.bind(me));
       }
 
@@ -127,7 +127,7 @@ function DnD(droppable, settings) {
       /**
        * Fires when file was dropped in the droppable area.
        *
-       * @param event
+       * @param {Event} event
        */
       ondrop: function (event) {
         // Prevent drop event from bubbling through parent elements.
@@ -196,6 +196,7 @@ function DnD(droppable, settings) {
             isValid = true;
             return false;
           }
+          return true;
         });
 
         if (!isValid) {
@@ -383,6 +384,7 @@ function DnD(droppable, settings) {
           me.removePreview(dndFile);
           return false;
         }
+        return true;
       });
 
       me.setFilesList(droppedFiles);
@@ -512,9 +514,7 @@ function DnD(droppable, settings) {
 
         // Call 'dnd:send:complete' handlers that have been saved earlier.
         $.each(completeHandlers, function (i, event) {
-          if (event.handler(response, status, sentFiles) === false) {
-            return false;
-          }
+          return event.handler(response, status, sentFiles);
         });
       };
 
